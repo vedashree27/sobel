@@ -1,0 +1,58 @@
+module sobel_module(
+ input clk,
+ input rst,
+
+ input [7:0] cam_r_i,
+ input [7:0] cam_g_i,
+ input [7:0] cam_b_i,
+ input cam_done_i,
+
+ output [7:0] sobel_r_o,
+ output [7:0] sobel_g_o,
+ output [7:0] sobel_b_o,
+ output sobel_done_o
+    );
+    
+    wire [7:0] sobel_grayscale_i;
+    wire sobel_grayscale_i_done;
+    
+    wire [7:0] sobel_grayscale_o;
+    wire sobel_grayscale_o_done;
+    
+    RGB_to_grayscale_module RGB_TO_GRAYSCALE(
+                  .clk(clk),
+                  .rst(rst),
+    
+                  .r_i(cam_r_i),
+                  .g_i(cam_g_i),
+                  .b_i(cam_b_i),
+                  .done_i(cam_done_i),
+    
+                  .grayscale_1_o(sobel_grayscale_i),
+                  .done_o(sobel_grayscale_i_done)
+        );
+        
+        sobel_kernel_module SOBEL_KERNEL_MODULE(
+               .clk(clk),
+               .rst(rst),
+        
+               .grayscale_1_i(sobel_grayscale_i),
+               .RGB_gray_done_i(sobel_grayscale_i_done),
+        
+               .grayscale_2_o(sobel_grayscale_o),
+               .sobel_kernel_done_o(sobel_grayscale_i_done)
+            );
+            
+        grayscale_to_RGB GRAYSCALE_TO_RGB(
+                 .clk(clk),
+                 .rst(rst),
+           
+                 .grayscale_i(sobel_grayscale_o),
+                 .done_i(sobel_grayscale_i_done),
+           
+                 .r_o(sobel_r_o),
+                 .g_o(sobel_g_o),
+                 .b_o(sobel_b_o),
+                 .done_o(sobel_done_o)
+               );
+endmodule

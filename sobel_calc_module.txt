@@ -1,0 +1,101 @@
+module sobel_calc(
+  input clk,
+  input rst,
+  input done_i,
+  input [7:0]d0_i,
+  input [7:0]d1_i,
+  input [7:0]d2_i,
+  input [7:0]d3_i,
+  input [7:0]d4_i,
+  input [7:0]d5_i,
+  input [7:0]d6_i,
+  input [7:0]d7_i,
+  input [7:0]d8_i,
+  
+  output reg [7:0] grayscale_o,
+  output done_o
+    );
+    
+    reg [9:0] gx_p;  //x positive value
+    reg [9:0] gx_n;  //x negative value
+    reg [9:0] gx_d;  //x data
+    
+     reg [9:0] gy_p;  //y positive value
+     reg [9:0] gy_n;  //y negative value
+     reg [9:0] gy_d;  //y data
+     
+     reg [9:0] g_sum;       //g_sum = |gx_d| + |gy_d|
+     reg [3:0] done_shift;  //we need 3 clk cycles to get g_sum and an additional clk cycle for output grayscale value
+ 
+ //------the below two blocks always run at he same clock cycle    
+     always@(posedge clk) begin
+       if(rst) begin
+         gx_p <= 0;
+         gx_n <= 0;
+       end
+       else begin
+         gx_p <= d6_i + (d3_i<<1) + d0_i;  //the multiplication by 2 once means left shift by 1
+         gx_n <= d8_i + (d5_i<<1) + d2_i;
+       end
+     end
+     
+      always@(posedge clk) begin
+        if(rst) begin
+          gy_p <= 0;
+          gy_n <= 0;
+        end
+        else begin
+          gy_p <= d0_i + (d1_i<<1) + d2_i;
+          gy_n <= d6_i + (d7_i<<1) + d8_i;
+        end
+      end
+      
+     always@(posedge clk) begin
+       if(rst) begin
+         gx_d <= 0;
+       end
+       else begin
+         gx_d <= (gx_p >= gx_n)?(gx_p - gx_n):(gx_n - gx_p);  //checking the magnitude and calculating the absolute value
+       end
+     end
+     
+     always@(posedge clk) begin
+       if(rst) begin
+         gy_d <= 0;
+       end
+       else begin
+         gy_d <= (gy_p >= gy_n)?(gy_p - gy_n):(gy_n - gy_p);
+       end
+     end
+     
+     always@(posedge clk) begin
+       if(rst) begin
+         g_sum <= 0;
+       end
+       else begin
+         g_sum <= gx_d +gy_d;
+       end
+     end
+ 
+ //-------output grayscale sobel values  
+     always@(posedge clk) begin
+       if(rst) begin
+         grayscale_o <= 0;
+       end
+       else begin
+         grayscale_o <= (g_sum >= 8'd60)? 8'd255 : g_sum[7:0];  //here we are comparing with a threshold value
+       end
+     end 
+     
+     always@(posedge clk) begin
+       if(rst) begin
+         done_shift <= 0;
+       end
+       else begin
+         done_shift <= {one_shift[2:0],done_i};
+       end
+     end
+     
+     assign done_o = done_shift;
+     
+endmodule

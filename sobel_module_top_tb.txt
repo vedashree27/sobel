@@ -1,0 +1,167 @@
+`define clk_period 10
+
+module sobel_module_tb();
+
+    reg clk;
+    reg rst;
+
+    reg [7:0] cam_r_i;
+    reg [7:0] cam_g_i;
+    reg [7:0] cam_b_i;
+    reg cam_done_i;
+
+    wire [7:0] sobel_r_o;
+    wire [7:0] sobel_g_o;
+    wire [7:0] sobel_b_o;
+    wire sobel_done_o;
+   
+
+ sobel_module SOBEL_MODULE(
+       .clk(clk),
+       .rst(rst),
+
+       .cam_r_i(cam_r_i),
+       .cam_g_i(cam_g_i),
+       .cam_b_i(cam_b_i),
+       .cam_done_i(cam_done_i),
+
+       .sobel_r_o(sobel_r_o),
+       .sobel_g_o(sobel_g_o),
+       .sobel_b_o(sobel_b_o),
+       .sobel_done_o(sobel_done_o)
+    );
+    
+    initial clk = 1'b1;
+    always #(`clk_period/2) clk = ~clk;
+
+ //----------------from RGB_to_grayscale_tb---------------another task------------------------------//    
+   integer i,j;
+    localparam RESULT_ARRAY_LEN = 600*600;   //----since a row of black color pixel is added on each side of image the resulting image dimension should be is increased
+    reg [7:0] result[0:RESULT_ARRAY_LEN-1];  //we put grayscale array into result array
+    
+    always@(posedge clk) begin
+       if(rst) begin
+         j <= 8'd0;
+       end
+       else begin
+         if(done_o) begin
+           result[j] <= sobel_r_o;
+           result[j+1] <= sobel_g_o;
+           result[j+2] <= sobel_b_o; 
+           j <= j+3;
+         end
+       end
+    end 
+    
+ //--------------------------------------readbmp task----------------------//
+      `define read_fileName "E:\vlsi\vlsi_projects\sobel\sobel.srcs\sources_1\new\jk.bmp"
+       localparam BMP_ARRAY_LEN = 600*600;
+       
+       reg [7:0] bmp_data[0: BMP_ARRAY_LEN-1];
+       integer bmp_size, bmp_start_pos,bmp_width, bmp_height, bmp_count;
+       
+       task readBMP;
+        integer fileId,i;
+         begin
+          fileId = $fopen("read_fileName","rb");
+          if(fileId == 0) begin
+            $display("open bmp error");
+            $finish;
+          end
+          else begin
+            $fread(bmp_data,fileId);
+            $fclose(fileId);
+            
+            bmp_size = {bmp_data[5], bmp_data[4], bmp_data[3], bmp_data[2]};
+            $display("bmp_size = %d\n", bmp_size);
+            bmp_start_pos = {bmp_data[13], bmp_data[12], bmp_data[11], bmp_data[10]};
+            $display("bmp_start_pos = %d\n", bmp_start_pos);
+            bmp_width = {bmp_data[21], bmp_data[20], bmp_data[19], bmp_data[18]};
+            $display("bmp_width = %d\n", bmp_width);
+            bmp_height = {bmp_data[25], bmp_data[24], bmp_data[23], bmp_data[22]};
+            $display("bmp_height = %d\n", bmp_height);
+            
+            bmp_count = {bmp_data[29], bmp_data[28]};
+            $display("bmp_count = %d\n", bmp_count);
+            
+            if(bmp_count!= 24)begin
+               $display("bmp_count need to be 24 bit\n");
+               $finish;
+            end
+            if(bmp_width%4) begin
+               $display("bmp_width%4 is needed o be zero");
+               $finish;
+            end
+            
+           /* for(i = bmp_start_pos;i < bmp_size; i=i+1) begin
+             $display("%h", bmp_data[i]);
+            end*/
+          end
+         end
+       endtask 
+       
+   //--------------------------write bmp task-------------------------// 
+        `define write_fileName "E:\vlsi\vlsi_projects\sobel\sobel.srcs\sources_1\new\result.bmp"  //----  ( we save written file as result.bmp)
+        
+        task wrieBMP;
+          integer fileId,i;
+          begin
+           fileId = $fopen("write_fileName","wb");
+           
+           for(i = 0; i < bmp_start_pos; i = i + 1) begin  //from i=0 to bmp_start_pos bmp data will be written
+              $fwrite(fileId,"%c",bmp_data[i]);
+           end
+           
+            for(i = bmp_start_pos; i < bmp_size;i = i + 1) begin  //from i=bmp_start_pos to bmp_size will be written
+              $fwrite(fileId,"%c",result[i-bmp_start_pos]);       //we need to put gray scale value into result array
+            end
+           
+           $fclose(fileId);
+           $display("writeBMP : done\n");
+          end
+        endtask
+        
+//------------------------initialization-----------------------//       
+            initial begin
+          //the below set of code initialize the above two modules(read and write) with input daa
+              rst = 1'b1;
+              cam_done_i = 1'b0;
+              
+              cam_r_i = 8'd0;
+              cam_g_i = 8'd0;
+              cam_b_i = 8'd0;
+              
+              readBMP;   //it prepares bmp file data
+              
+              #(`clk_period);
+              rst = 1'b0;
+              //the below will read the bmp file data from bmp start position to end of file and put it on RGB_to_grayscale module uut
+               //read the data frombmp data array
+              for (i = bmp_start_pos; i < bmp_size; i = i + 3) begin
+                    cam_r_i = bmp_data[i+2];
+                    cam_g_i = bmp_data[i+1];
+                    cam_b_i = bmp_data[i];
+                    
+                    #(`clk_period);
+                    cam_done_i = 1'b1;
+              end
+              
+               #(`clk_period);
+               cam_done_i = 1'b0;
+               
+               #(`clk_period);
+               #(`clk_period);
+               #(`clk_period);
+               #(`clk_period);
+               #(`clk_period);
+               #(`clk_period);
+               #(`clk_period);
+               #(`clk_period);
+               #(`clk_period);
+               writeBMP;   //write the processed data not the bmp data to a file
+               
+                #(`clk_period);
+                $stop;
+            end  
+        
+endmodule

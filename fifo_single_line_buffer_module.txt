@@ -1,0 +1,61 @@
+module fifo_single_line_buffer(
+    input clk,
+    input rst,
+    input we_i,
+    input [7:0] data_i,
+    output [7:0] data_o,
+    output done_o
+    );
+    
+   parameter DEPTH = 600;       //regular size for an image
+    reg [7:0]mem[0:DEPTH-1];
+    
+    reg [9:0] wr_pointer;       //decimal 600  is 10 bit binary value. may be to know which pixel we are writing or reading 
+    reg [9:0] rd_pointer;  
+    
+    reg [9:0] icounter;        //to count the number of pixels
+    
+    assign done_o = (icounter == DEPTH)?1:0;
+    assign data_o = mem[rd_pointer];
+    
+    //--------------------handle with icounter----------------------//
+    always@(posedge clk) begin
+      if(rst) begin
+        icounter <= 0;
+      end
+      else begin
+        if(we_i == 1) begin            //enable the write signal
+          icounter <= (icounter == DEPTH)?icounter:icounter+1;
+        end
+      end 
+    end
+ 
+ //-----------------------handling the write pointer signal-----------------//
+    always@(posedge clk) begin
+      if(rst) begin
+        wr_pointer <= 0;
+      end
+      else begin
+        if(we_i == 1) begin
+           mem[wr_pointer] <= data_i;
+           wr_pointer <= (wr_pointer == DEPTH-1)?0:wr_pointer+1;
+        end
+      end
+    end 
+    
+ //-----------------------handling read pointer signal------------//
+    //read operation begins only after a whole line is written into the line buffer
+    always@(posedge clk) begin
+      if(rst) begin
+        rd_pointer <= 0;
+      end
+      else begin
+        if(we_i == 1) begin
+           if(icounter == DEPTH) begin   //a whole line buffer is filled
+              rd_pointer <= (rd_pointer == DEPTH-1)?0:rd_pointer+1;
+           end
+        end
+      end
+    end    
+            
+endmodule
